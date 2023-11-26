@@ -257,6 +257,11 @@ interface ConnectionInterface
     /**
      * @param array $args
      */
+    public function batchWrite(array $args);
+
+    /**
+     * @param array $args
+     */
     public function getOperation(array $args);
 
     /**

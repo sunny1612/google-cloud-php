@@ -1923,6 +1923,32 @@ class Database
     }
 
     /**
+     * Batch Write
+     */
+    public function batchWrite(array $mutationGroups, array $options = [])
+    {
+        if ($this->isRunningTransaction) {
+            throw new \BadMethodCallException('Nested transactions are not supported by this client.');
+        }
+        // Prevent nested transactions.
+        $this->isRunningTransaction = true;
+        $session = $this->selectSession(
+            SessionPoolInterface::CONTEXT_READWRITE,
+            $this->pluck('sessionOptions', $options, false) ?: []
+        );
+        try {
+            return $this->connection()->batchWrite([
+                'database' => $this->name(),
+                'session' => $session->name(),
+                'mutationGroups' => $this->buildMutationGroups($mutationGroups)
+            ] + $options);
+        } finally {
+            $this->isRunningTransaction = false;
+            $session->setExpiration();
+        }
+    }
+
+    /**
      * Get the underlying session pool implementation.
      *
      * Example:
@@ -2149,5 +2175,30 @@ class Database
         }
 
         return sprintf('CREATE DATABASE `%s`', $databaseId);
+    }
+
+    private function buildMutationGroups($inputMutationGroups)
+    {
+        $mutationGroups = [];
+        foreach ($inputMutationGroups as $mg) {
+            $mutationGroup = [];
+            foreach ($mg as $mutation) {
+                $mutationGroup[] = $this->buildMutation(
+                    $this->pluck('operation', $mutation),
+                    $this->pluck('table', $mutation),
+                    $this->pluck('data', $mutation)
+                );
+            }
+            $mutationGroups[] = $mutationGroup;
+        }
+        return $mutationGroups;
+    }
+
+    private function buildMutation($op, $table, $data)
+    {
+        if ($op === Operation::OP_DELETE) {
+            return $this->operation->deleteMutation($table, $data);
+        }
+        return $this->operation->mutation($op, $table, $data);
     }
 }

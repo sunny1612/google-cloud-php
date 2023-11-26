@@ -167,6 +167,26 @@ class WriteTest extends SpannerTestCase
         $this->assertEquals($value->formatAsString(), $row[$field]->formatAsString());
     }
 
+    public function testBatchWrite()
+    {
+        $id = $this->randId();
+        $field = 'bytesField';
+        $value = new Bytes('hello world');
+
+        $db = self::$database;
+        $mutation = [
+            'operation' => 'insertOrUpdate',
+            'table' => self::TABLE_NAME,
+            'data' => [
+                'id' => $id,
+                $field => $value
+            ]
+        ];
+        $mutationGroups = [[$mutation]];
+        $options = [];
+        var_dump(iterator_to_array($db->batchWrite($mutationGroups, $options)));
+    }
+
     /**
      * covers 84
      */
